@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>YLAC</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background: #121212;
+    color: white;
+}
+
+header {
+    padding: 30px 20px;
+    text-align: center;
+    background: #1e1e1e;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 3rem;
+}
+
+header p {
+    opacity: .7;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+}
+
+#search {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    margin-bottom: 25px;
+    background: #222;
+    color: white;
+}
+
+.song {
+    background: #1d1d1d;
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+
+.song h2 {
+    margin-top: 0;
+}
+
+.meta {
+    color: #bbb;
+    margin-bottom: 10px;
+}
+
+audio {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.download {
+    display: inline-block;
+    margin-top: 15px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: #4CAF50;
+    color: white;
+    text-decoration: none;
+}
+
+.download:hover {
+    opacity: .8;
+}
+
+#status {
+    text-align: center;
+    opacity: .7;
+    padding: 20px;
+}
+
+footer {
+    text-align: center;
+    padding: 30px;
+    opacity: .5;
+}
+
+@media (max-width: 600px) {
+    header h1 {
+        font-size: 2rem;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🎵 YLAC</h1>
+    <p>Young Ledger Line Audio Collection Share Storage</p>
+</header>
+
+<div class="container">
+
+    <input
+        id="search"
+        type="text"
+        placeholder="Search by title, artist, album..."
+    >
+
+    <div id="status">
+        Loading songs...
+    </div>
+
+    <div id="songs"></div>
+
+</div>
+
+<footer>
+    Powered by GitHub Pages • YLAC
+</footer>
+
+<script>
+let allSongs = [];
+
+async function loadSongs() {
+
+    const status = document.getElementById("status");
+
+    try {
+
+        const response = await fetch("songs.json");
+
+        if (!response.ok)
+            throw new Error("Failed to load songs.json");
+
+        allSongs = await response.json();
+
+        status.style.display = "none";
+
+        renderSongs(allSongs);
+
+    } catch (e) {
+
+        status.innerHTML =
+            "Failed to load songs list.";
+
+        console.error(e);
+    }
+}
+
+function renderSongs(list) {
+
+    const container = document.getElementById("songs");
+
+    container.innerHTML = "";
+
+    if (list.length === 0) {
+
+        container.innerHTML = `
+            <div class="song">
+                No songs found.
+            </div>
+        `;
+
+        return;
+    }
+
+    list.forEach(song => {
+
+        const card = document.createElement("div");
+
+        card.className = "song";
+
+        card.innerHTML = `
+            <h2>${escapeHtml(song.title || "Unknown Title")}</h2>
+
+            <div class="meta">
+                👤 ${escapeHtml(song.artist || "Unknown Artist")}
+                <br>
+                💿 ${escapeHtml(song.album || "Unknown Album")}
+                <br>
+                ⏱ ${formatDuration(song.duration)}
+            </div>
+
+            <audio controls preload="none">
+                <source src="${song.file}">
+            </audio>
+
+            <br>
+
+            <a
+                class="download"
+                href="${song.file}"
+                download
+            >
+                Download
+            </a>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+function formatDuration(seconds) {
+
+    seconds = parseInt(seconds);
+
+    if (isNaN(seconds))
+        return "Unknown";
+
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function escapeHtml(text) {
+
+    const div = document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+}
+
+document.getElementById("search")
+.addEventListener("input", function() {
+
+    const q = this.value.toLowerCase();
+
+    const filtered = allSongs.filter(song => {
+
+        return (
+            (song.title || "").toLowerCase().includes(q) ||
+            (song.artist || "").toLowerCase().includes(q) ||
+            (song.album || "").toLowerCase().includes(q)
+        );
+
+    });
+
+    renderSongs(filtered);
+});
+
+loadSongs();
+</script>
+
+</body>
+      </html>

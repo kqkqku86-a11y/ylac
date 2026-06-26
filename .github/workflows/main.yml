@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     steps:
@@ -77,24 +77,38 @@ jobs:
 
           exit $FAILED
 
-      - name: Generate metadata
+      - name: Generate metadata 
         env:
-          FILES: ${{ steps.changed.outputs.all_changed_files }}
+         FILES: ${{ steps.changed.outputs.all_changed_files }}
         run: |
-          mkdir metadata-report
+          mkdir -p metadata
 
           for file in $FILES; do
-            [ -f "$file" ] || continue
+          [ -f "$file" ] || continue
 
-            BASENAME=$(basename "$file")
+          BASENAME=$(basename "$file")
 
-            ffprobe \
-              -v quiet \
-              -print_format json \
-              -show_format \
-              "$file" \
-              > "metadata-report/${BASENAME}.json"
+          ffprobe \
+          -v quiet \
+          -print_format json \
+          -show_format \
+          "$file" \
+          > "metadata/${BASENAME}.json"
           done
+
+      - name: Commit metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add metadata/
+
+          if ! git diff --cached --quiet; then
+          git commit -m "Auto generate metadata"
+          git push
+          else
+          echo "No metadata changes"
+          fi
 
       - name: Upload metadata artifact
         uses: actions/upload-artifact@v4

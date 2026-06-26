@@ -28,37 +28,38 @@ jobs:
       - name: Generate songs.json from metadata
         run: |
           mkdir -p docs
+
           echo "[" > docs/songs.json
           FIRST=true
 
           for meta in metadata/*.json; do
-            [ -f "$meta" ] || continue
+          [ -f "$meta" ] || continue
 
-            FILE_NAME=$(basename "$meta" .json)
-            TITLE=$(jq -r '.format.tags.title // "Unknown Title"' "$meta")
-            ARTIST=$(jq -r '.format.tags.artist // "Unknown Artist"' "$meta")
-            ALBUM=$(jq -r '.format.tags.album // "Unknown Album"' "$meta")
-            DURATION=$(jq -r '.format.duration // 0' "$meta")
+          FILE_NAME=$(basename "$meta" .json)
 
-            FILE_PATH="songs/$FILE_NAME"
-            URL="https://raw.githubusercontent.com/${{ github.repository }}/main/${FILE_PATH}"
+          TITLE=$(jq -r '.format.tags.title // "Unknown Title"' "$meta")
+          ARTIST=$(jq -r '.format.tags.artist // "Unknown Artist"' "$meta")
+          ALBUM=$(jq -r '.format.tags.album // "Unknown Album"' "$meta")
+          DURATION=$(jq -r '.format.duration // 0' "$meta")
 
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              echo "," >> docs/songs.json
-            fi
+          FILE_PATH="songs/$FILE_NAME"
+          URL="https://raw.githubusercontent.com/${{ github.repository }}/main/${FILE_PATH}"
 
-            # TANPA INDENT + EOF AMAN
-            cat >> docs/songs.json <<EOF
-{
-  "title": "$TITLE",
-  "artist": "$ARTIST",
-  "album": "$ALBUM",
-  "duration": "$DURATION",
-  "file": "$URL"
-}
-EOF
+          if [ "$FIRST" = true ]; then
+          FIRST=false
+          else
+          echo "," >> docs/songs.json
+          fi
+
+          # TANPA EOF, TANPA echo JSON RAW
+          jq -n \
+          --arg title "$TITLE" \
+          --arg artist "$ARTIST" \
+          --arg album "$ALBUM" \
+          --arg duration "$DURATION" \
+          --arg file "$URL" \
+          '{title:$title, artist:$artist, album:$album, duration:$duration, file:$file}' \
+          >> docs/songs.json
 
           done
 

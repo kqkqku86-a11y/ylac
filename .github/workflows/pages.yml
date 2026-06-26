@@ -1,0 +1,109 @@
+name: Build and Deploy Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'songs/**'
+      - 'metadata/**'
+      - 'docs/**'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt update && sudo apt install -y jq
+
+      - name: Generate songs.json from metadata
+        run: |
+          mkdir -p docs
+
+          echo "[" > docs/songs.json
+
+          FIRST=true
+
+          for meta in metadata/*.json; do
+
+            [ -f "$meta" ] || continue
+
+            FILE_NAME=$(basename "$meta" .json)
+
+            TITLE=$(jq -r '.format.tags.title // "Unknown Title"' "$meta")
+            ARTIST=$(jq -r '.format.tags.artist // "Unknown Artist"' "$meta")
+            ALBUM=$(jq -r '.format.tags.album // "Unknown Album"' "$meta")
+            DURATION=$(jq -r '.format.duration // 0' "$meta")
+
+            FILE_PATH="songs/$FILE_NAME"
+
+            URL="https://raw.githubusercontent.com/${{ github.repository }}/main/${FILE_PATH}"
+
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              echo "," >> docs/songs.json
+            fi
+
+            cat >> docs/songs.json <<EOF
+            {
+            "title": "$TITLE",
+            "artist": "$ARTIST",
+            "album": "$ALBUM",
+            "duration": "$DURATION",
+            "file": "$URL"
+            }
+            EOF
+
+          done
+
+          echo "]" >> docs/songs.json
+
+          echo "Generated songs.json:"
+          cat docs/songs.json
+
+      - name: Commit updated songs.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add docs/songs.json
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto update songs.json"
+            git push
+          else
+            echo "No changes."
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+  deploy:
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

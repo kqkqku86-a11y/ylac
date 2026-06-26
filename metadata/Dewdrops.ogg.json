@@ -1,0 +1,14 @@
+{
+    "format": {
+        "filename": "songs/Dewdrops.ogg",
+        "nb_streams": 1,
+        "nb_programs": 0,
+        "format_name": "ogg",
+        "format_long_name": "Ogg",
+        "start_time": "0.000000",
+        "duration": "60.000000",
+        "size": "2698619",
+        "bit_rate": "359815",
+        "probe_score": 100
+    }
+}

@@ -61,8 +61,8 @@ jobs:
             "album": "$ALBUM",
             "duration": "$DURATION",
             "file": "$URL"
-            }
-            EOF
+            } 
+EOF
 
           done
 

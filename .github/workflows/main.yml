@@ -19,7 +19,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt install -y ffmpeg file chromaprint-tools jq curl
+          sudo update
+          sudo apt install -y ffmpeg file libchromaprint-tools jq curl
 
       - name: Get changed files
         id: changed

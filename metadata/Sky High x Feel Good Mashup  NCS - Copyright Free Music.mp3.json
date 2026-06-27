@@ -1,0 +1,20 @@
+{
+    "format": {
+        "filename": "songs/ncs/Sky High x Feel Good Mashup  NCS - Copyright Free Music.mp3",
+        "nb_streams": 1,
+        "nb_programs": 0,
+        "format_name": "mp3",
+        "format_long_name": "MP2/3 (MPEG audio layer 2/3)",
+        "start_time": "0.025057",
+        "duration": "157.152653",
+        "size": "3772427",
+        "bit_rate": "192038",
+        "probe_score": 51,
+        "tags": {
+            "major_brand": "dash",
+            "minor_version": "0",
+            "compatible_brands": "iso6mp41",
+            "encoder": "Lavf60.16.100"
+        }
+    }
+}

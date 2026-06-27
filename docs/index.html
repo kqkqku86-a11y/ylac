@@ -13,7 +13,7 @@
 
 body {
     font-family: sans-serif;
-    background: #f5f5f5;
+    background: #f0f0f0;
     color: #222;
     font-size: 15px;
 }
@@ -21,33 +21,33 @@ body {
 header {
     background: #fff;
     border-bottom: 1px solid #ddd;
-    padding: 14px 20px;
+    padding: 12px 20px;
 }
 
 header h1 {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     font-weight: bold;
 }
 
 header p {
-    color: #666;
-    font-size: 0.85rem;
+    color: #777;
+    font-size: 0.8rem;
     margin-top: 2px;
 }
 
 .container {
-    max-width: 700px;
+    max-width: 680px;
     margin: 0 auto;
-    padding: 16px;
+    padding: 14px 16px;
 }
 
 #search {
     width: 100%;
-    padding: 8px 10px;
+    padding: 7px 10px;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 3px;
     font-size: 14px;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     background: #fff;
     color: #222;
 }
@@ -57,48 +57,88 @@ header p {
     border-color: #888;
 }
 
+/* Card */
 .song {
+    position: relative;
+    overflow: hidden;
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 4px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
+    padding: 11px 13px;
+    margin-bottom: 9px;
+}
+
+/* Video background */
+.song .bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.4s;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.song.playing .bg-video {
+    opacity: 0.18;
+}
+
+/* Content above video */
+.song-body {
+    position: relative;
+    z-index: 1;
+}
+
+.song-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.song-id {
+    font-size: 0.75rem;
+    color: #999;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .song h2 {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: bold;
-    margin-bottom: 6px;
     word-break: break-word;
+    line-height: 1.3;
 }
 
 .meta {
     color: #666;
-    font-size: 0.8rem;
-    margin-bottom: 8px;
-    line-height: 1.6;
+    font-size: 0.78rem;
+    margin-bottom: 7px;
+    line-height: 1.7;
 }
 
 audio {
     width: 100%;
-    height: 32px;
-    margin-top: 6px;
+    height: 30px;
     display: block;
+    margin-top: 4px;
 }
 
 .download {
     display: inline-block;
-    margin-top: 8px;
-    padding: 5px 12px;
-    background: #333;
+    margin-top: 7px;
+    padding: 4px 11px;
+    background: #444;
     color: #fff;
     text-decoration: none;
     border-radius: 3px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
 }
 
 .download:hover {
-    background: #555;
+    background: #666;
 }
 
 #status {
@@ -110,11 +150,11 @@ audio {
 
 footer {
     text-align: center;
-    padding: 20px;
+    padding: 18px;
     color: #aaa;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     border-top: 1px solid #ddd;
-    margin-top: 10px;
+    margin-top: 6px;
 }
 </style>
 </head>
@@ -131,11 +171,10 @@ footer {
     <input
         id="search"
         type="text"
-        placeholder="Search by title, artist, album..."
+        placeholder="Search by title, artist, album, genre..."
     >
 
     <div id="status">Loading songs...</div>
-
     <div id="songs"></div>
 
 </div>
@@ -150,19 +189,32 @@ let allSongs = [];
 function titleFromFile(fileUrl) {
     try {
         const parts = decodeURIComponent(fileUrl).split('/');
-        const filename = parts[parts.length - 1];
-        return filename.replace(/\.[^.]+$/, '');
+        return parts[parts.length - 1].replace(/\.[^.]+$/, '');
     } catch (e) {
         return fileUrl;
     }
 }
 
+function formatDuration(seconds) {
+    seconds = parseInt(seconds);
+    if (isNaN(seconds)) return 'Unknown';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins + ':' + String(secs).padStart(2, '0');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
 async function loadSongs() {
     const status = document.getElementById('status');
     try {
-        const response = await fetch('songs.json');
-        if (!response.ok) throw new Error('Failed to load songs.json');
-        allSongs = await response.json();
+        const res = await fetch('songs.json');
+        if (!res.ok) throw new Error('Failed to load songs.json');
+        allSongs = await res.json();
         status.style.display = 'none';
         renderSongs(allSongs);
     } catch (e) {
@@ -176,7 +228,7 @@ function renderSongs(list) {
     container.innerHTML = '';
 
     if (list.length === 0) {
-        container.innerHTML = '<div class="song">No songs found.</div>';
+        container.innerHTML = '<div class="song"><div class="song-body">No songs found.</div></div>';
         return;
     }
 
@@ -187,46 +239,57 @@ function renderSongs(list) {
 
         const card = document.createElement('div');
         card.className = 'song';
+
+        // Video background (jika ada)
+        const videoBg = song.video
+            ? `<video class="bg-video" src="${escapeHtml(song.video)}" muted loop playsinline></video>`
+            : '';
+
         card.innerHTML = `
-            <h2>${escapeHtml(title)}</h2>
-            <div class="meta">
-                Artist: ${escapeHtml(song.artist || 'Unknown')}<br>
-                Album: ${escapeHtml(song.album || 'Unknown')}<br>
-                Duration: ${formatDuration(song.duration)}
+            ${videoBg}
+            <div class="song-body">
+                <div class="song-header">
+                    <span class="song-id">#${escapeHtml(song.id ?? '')}</span>
+                    <h2>${escapeHtml(title)}</h2>
+                </div>
+                <div class="meta">
+                    Artist: ${escapeHtml(song.artist || 'Unknown')}<br>
+                    Album: ${escapeHtml(song.album || 'Unknown')}<br>
+                    Genre: ${escapeHtml(song.genre || 'Unknown')}<br>
+                    Duration: ${formatDuration(song.duration)}
+                </div>
+                <audio controls preload="none" controlsList="nodownload" oncontextmenu="return false;">
+                    <source src="${escapeHtml(song.file)}">
+                </audio>
+                <a class="download" href="${escapeHtml(song.file)}" download>Download</a>
             </div>
-            <audio controls preload="none">
-                <source src="${escapeHtml(song.file)}">
-            </audio>
-            <a class="download" href="${escapeHtml(song.file)}" download>Download</a>
         `;
+
+        // Sinkronisasi video BG dengan audio
+        const audio = card.querySelector('audio');
+        const video = card.querySelector('.bg-video');
+
+        if (audio && video) {
+            audio.addEventListener('play',  () => { card.classList.add('playing');    video.play();  });
+            audio.addEventListener('pause', () => { card.classList.remove('playing'); video.pause(); });
+            audio.addEventListener('ended', () => { card.classList.remove('playing'); video.pause(); video.currentTime = 0; });
+        }
+
         container.appendChild(card);
     });
-}
-
-function formatDuration(seconds) {
-    seconds = parseInt(seconds);
-    if (isNaN(seconds)) return 'Unknown';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return mins + ':' + String(secs).padStart(2, '0');
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 document.getElementById('search').addEventListener('input', function () {
     const q = this.value.toLowerCase();
     const filtered = allSongs.filter(song => {
         const title = (song.title && song.title !== 'Unknown Title')
-            ? song.title
-            : titleFromFile(song.file);
+            ? song.title : titleFromFile(song.file);
         return (
             title.toLowerCase().includes(q) ||
             (song.artist || '').toLowerCase().includes(q) ||
-            (song.album || '').toLowerCase().includes(q)
+            (song.album  || '').toLowerCase().includes(q) ||
+            (song.genre  || '').toLowerCase().includes(q) ||
+            String(song.id || '').includes(q)
         );
     });
     renderSongs(filtered);

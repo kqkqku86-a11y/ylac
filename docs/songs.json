@@ -1,17 +1,23 @@
 [
 {
+  "id": 10001,
   "title": "Dewdrops",
   "artist": "Unknown Artist",
   "album": "Unknown Album",
+  "genre": "Unknown Genre",
   "duration": "60.000000",
-  "file": "https://raw.githubusercontent.com/kqkqku86-a11y/ylac/main/songs/Dewdrops.ogg"
+  "file": "https://raw.githubusercontent.com/kqkqku86-a11y/ylac/main/songs/Dewdrops.ogg",
+  "video": null
 }
 ,
 {
+  "id": 10002,
   "title": "Sky High x Feel Good Mashup  NCS - Copyright Free Music",
   "artist": "Unknown Artist",
   "album": "Unknown Album",
+  "genre": "Unknown Genre",
   "duration": "157.152653",
-  "file": "https://raw.githubusercontent.com/kqkqku86-a11y/ylac/main/songs/ncs/Sky High x Feel Good Mashup  NCS - Copyright Free Music.mp3"
+  "file": "https://raw.githubusercontent.com/kqkqku86-a11y/ylac/main/songs/ncs/Sky High x Feel Good Mashup  NCS - Copyright Free Music.mp3",
+  "video": null
 }
 ]

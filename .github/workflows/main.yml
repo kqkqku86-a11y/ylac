@@ -1,0 +1,246 @@
+name: YLAC Check
+
+on:
+  pull_request:
+    paths:
+      - 'songs/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y ffmpeg file libchromaprint-tools jq curl
+
+      - name: Get changed files
+        id: changed
+        uses: tj-actions/changed-files@v46
+        with:
+          files: songs/**
+          separator: "\n"    # <-- Pisahkan dengan newline, bukan spasi
+
+      - name: Validate files
+        env:
+          FILES: ${{ steps.changed.outputs.all_changed_files }}
+        run: |
+          FAILED=0
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            echo "Checking $file"
+
+            # Must exist
+            [ -f "$file" ] || continue
+
+            # Size limit 100MB
+            SIZE=$(stat -c%s "$file")
+
+            if [ "$SIZE" -gt 104857600 ]; then
+              echo "::error::$file exceeds 100MB"
+              FAILED=1
+            fi
+
+            # Reject dangerous extensions
+            case "$file" in
+              *.exe|*.apk|*.ipa|*.dll|*.jar|*.msi|*.bat|*.cmd|*.sh|*.so)
+                echo "::error::$file has forbidden extension"
+                FAILED=1
+                ;;
+            esac
+
+            # Check MIME type
+            MIME=$(file --mime-type -b "$file")
+
+            echo "Mime: $MIME"
+
+            if [[ ! "$MIME" =~ ^audio/ ]]; then
+              echo "::error::$file is not an audio file"
+              FAILED=1
+            fi
+
+            # Verify ffprobe can read it
+            ffprobe "$file" >/dev/null 2>&1
+
+            if [ $? -ne 0 ]; then
+              echo "::error::$file is not a valid audio"
+              FAILED=1
+            fi
+          done <<< "$FILES"
+
+          exit $FAILED
+
+      - name: Generate metadata
+        env:
+          FILES: ${{ steps.changed.outputs.all_changed_files }}
+        run: |
+          mkdir -p metadata
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            [ -f "$file" ] || continue
+
+            BASENAME=$(basename "$file")
+
+            ffprobe \
+              -v quiet \
+              -print_format json \
+              -show_format \
+              "$file" \
+              > "metadata/${BASENAME}.json"
+          done <<< "$FILES"
+
+      - name: Commit metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add metadata/
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto generate metadata"
+            git push origin HEAD:${{ github.head_ref }}
+          else
+            echo "No metadata changes"
+          fi
+
+      - name: Upload metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ylac-metadata
+          path: metadata-report/
+
+      - name: AcoustID scan
+        if: success()
+        env:
+          FILES: ${{ steps.changed.outputs.all_changed_files }}
+          API_KEY: ${{ secrets.ACOUSTID_API_KEY }}
+        run: |
+          mkdir -p acoustid-report
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            [ -f "$file" ] || continue
+
+            echo "Fingerprinting $file"
+
+            OUTPUT=$(fpcalc "$file")
+
+            DURATION=$(echo "$OUTPUT" | grep DURATION | cut -d= -f2)
+            FINGERPRINT=$(echo "$OUTPUT" | grep FINGERPRINT | cut -d= -f2-)
+
+            RESPONSE=$(curl -s \
+              "https://api.acoustid.org/v2/lookup?client=${API_KEY}&meta=recordings&duration=${DURATION}&fingerprint=${FINGERPRINT}")
+
+            echo "$RESPONSE" > "acoustid-report/$(basename "$file").json"
+
+            FOUND=$(echo "$RESPONSE" | jq '.results | length')
+
+            if [ "$FOUND" -gt 0 ]; then
+              echo "::warning::$file matched AcoustID database"
+            fi
+          done <<< "$FILES"
+
+      - name: Upload AcoustID artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: acoustid-report
+          path: acoustid-report/
+
+      - name: VirusTotal scan
+        if: success()
+        env:
+          FILES: ${{ steps.changed.outputs.all_changed_files }}
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          FAILED=0
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            [ -f "$file" ] || continue
+
+            echo "Uploading $file to VirusTotal"
+
+            RESPONSE=$(curl -s \
+              --request POST \
+              --url https://www.virustotal.com/api/v3/files \
+              --header "x-apikey: ${VT_API_KEY}" \
+              --form file=@"$file")
+
+            echo "$RESPONSE"
+
+            ANALYSIS_ID=$(echo "$RESPONSE" | jq -r '.data.id')
+
+            if [ -z "$ANALYSIS_ID" ] || [ "$ANALYSIS_ID" = "null" ]; then
+              echo "::warning::VirusTotal upload failed for $file"
+              FAILED=1
+              continue
+            fi
+
+            echo "Analysis ID: $ANALYSIS_ID"
+            echo "Waiting for scan result..."
+
+            STATUS="queued"
+            ATTEMPT=0
+            while [ "$STATUS" != "completed" ]; do
+              sleep 15
+              ATTEMPT=$((ATTEMPT + 1))
+              RESULT=$(curl -s \
+                --request GET \
+                --url "https://www.virustotal.com/api/v3/analyses/${ANALYSIS_ID}" \
+                --header "x-apikey: ${VT_API_KEY}")
+              STATUS=$(echo "$RESULT" | jq -r '.data.attributes.status')
+              echo "Attempt $ATTEMPT — status: $STATUS"
+            done
+
+            MALICIOUS=$(echo "$RESULT" | jq '.data.attributes.stats.malicious')
+            SUSPICIOUS=$(echo "$RESULT" | jq '.data.attributes.stats.suspicious')
+            HARMLESS=$(echo "$RESULT" | jq '.data.attributes.stats.harmless')
+
+            echo "Harmless:   $HARMLESS"
+            echo "Malicious:  $MALICIOUS"
+            echo "Suspicious: $SUSPICIOUS"
+
+            if [ "$MALICIOUS" -gt 0 ] || [ "$SUSPICIOUS" -gt 0 ]; then
+              echo "::error::$file detected as malicious or suspicious"
+              FAILED=1
+            else
+              echo "✓ $file passed VirusTotal scan"
+            fi
+          done <<< "$FILES"
+
+          exit $FAILED
+
+      - name: Add safe label
+        if: success()
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: safe
+
+      - name: Comment PR
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          message: |
+            # 🎵 YLAC Automated Review
+
+            ✅ Audio validation completed.
+            ✅ Metadata extracted.
+            ✅ AcoustID checked.
+            ✅ VirusTotal submitted.
+
+            Download artifacts above to inspect metadata and fingerprints.
+
+            Final merge decision remains with maintainers.

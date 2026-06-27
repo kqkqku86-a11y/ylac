@@ -1,13 +1,9 @@
 # ylac
-♪♪♪
+
 ![apta](20260626_170704.png)
 
-## Fun Fact
+YLAC stands for Young Ledger Line Audio Collection Share Storage.
 
-Why is it called `ylac`?
+## Why the name?
 
-Because `flac` was already taken by reality.
-
-> YLAC = Young Ledger Line Audio Collection Share Storage
-
-Don't ask.
+Because `flac` was already taken by reality. Don't ask.

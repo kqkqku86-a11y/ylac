@@ -32,36 +32,43 @@ jobs:
           echo "[" > docs/songs.json
           FIRST=true
 
-          for meta in metadata/*.json; do
-          [ -f "$meta" ] || continue
+          while IFS= read -r meta; do
+            [ -f "$meta" ] || continue
 
-          FILE_NAME=$(basename "$meta" .json)
+            # Ambil path file asli dari dalam metadata (sudah termasuk subdirektori)
+            FILE_PATH=$(jq -r '.format.filename' "$meta")
 
-          TITLE=$(jq -r '.format.tags.title // "Unknown Title"' "$meta")
-          ARTIST=$(jq -r '.format.tags.artist // "Unknown Artist"' "$meta")
-          ALBUM=$(jq -r '.format.tags.album // "Unknown Album"' "$meta")
-          DURATION=$(jq -r '.format.duration // 0' "$meta")
+            # Fallback title: pakai tag jika ada, jika tidak pakai nama file tanpa ekstensi
+            TITLE=$(jq -r '
+              if (.format.tags.title // "") != "" then
+                .format.tags.title
+              else
+                (.format.filename | split("/") | last | gsub("\\.[^.]+$"; ""))
+              end
+            ' "$meta")
 
-          FILE_PATH="songs/$FILE_NAME"
-          URL="https://raw.githubusercontent.com/${{ github.repository }}/main/${FILE_PATH}"
+            ARTIST=$(jq -r '.format.tags.artist // "Unknown Artist"' "$meta")
+            ALBUM=$(jq -r '.format.tags.album // "Unknown Album"' "$meta")
+            DURATION=$(jq -r '.format.duration // 0' "$meta")
 
-          if [ "$FIRST" = true ]; then
-          FIRST=false
-          else
-          echo "," >> docs/songs.json
-          fi
+            URL="https://raw.githubusercontent.com/${{ github.repository }}/main/${FILE_PATH}"
 
-          # TANPA EOF, TANPA echo JSON RAW
-          jq -n \
-          --arg title "$TITLE" \
-          --arg artist "$ARTIST" \
-          --arg album "$ALBUM" \
-          --arg duration "$DURATION" \
-          --arg file "$URL" \
-          '{title:$title, artist:$artist, album:$album, duration:$duration, file:$file}' \
-          >> docs/songs.json
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              echo "," >> docs/songs.json
+            fi
 
-          done
+            jq -n \
+              --arg title    "$TITLE" \
+              --arg artist   "$ARTIST" \
+              --arg album    "$ALBUM" \
+              --arg duration "$DURATION" \
+              --arg file     "$URL" \
+              '{title:$title, artist:$artist, album:$album, duration:$duration, file:$file}' \
+              >> docs/songs.json
+
+          done < <(find metadata -name "*.json" -type f | sort)
 
           echo "]" >> docs/songs.json
           echo "Generated songs.json:"

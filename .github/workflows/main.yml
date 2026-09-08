@@ -14,12 +14,19 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          allow-unsafe-pr-checkout: true
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          # 1. Izinkan akses pr checkout (diperlukan untuk pull_request_target)
+          allow-unsafe-pr-checkout: true 
+
+          # 2. HAPUS baris 'repository' (biarkan default ke repositori utama Anda)
+          # GitHub otomatis tahu cara menghubungkannya jika parameter ref-nya tepat.
+
+          # 3. Gunakan referensi cabang PR asli, BUKAN SHA-nya langsung
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+          # 4. Ambil seluruh riwayat komit dari repositori utama agar Git tahu titik temunya
           fetch-depth: 0
 
       - name: Fetch Base Branch

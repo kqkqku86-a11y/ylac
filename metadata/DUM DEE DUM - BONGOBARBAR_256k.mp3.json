@@ -1,0 +1,23 @@
+{
+    "format": {
+        "filename": "songs/DUM DEE DUM - BONGOBARBAR_256k.mp3",
+        "nb_streams": 2,
+        "nb_programs": 0,
+        "format_name": "mp3",
+        "format_long_name": "MP2/3 (MPEG audio layer 2/3)",
+        "start_time": "0.025056",
+        "duration": "249.286531",
+        "size": "7278213",
+        "bit_rate": "233569",
+        "probe_score": 51,
+        "tags": {
+            "title": "BONGOBARBAR",
+            "artist": "DUM DEE DUM",
+            "album": "DUM DEE DUM",
+            "major_brand": "dash",
+            "minor_version": "0",
+            "compatible_brands": "iso6mp41",
+            "encoder": "Lavf58.35.101"
+        }
+    }
+}
